@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Downhill Fury" />
+  <title>Downhill Fury 3D</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a2a3a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    /* HUD */
+    #hud {
+      position: fixed;
+      top: env(safe-area-inset-top, 12px);
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-box {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 8px 12px;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .hud-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .hud-row:last-child { margin-bottom: 0; }
+    .bar-wrap {
+      width: 90px;
+      height: 8px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    #energyBar {
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, #f59e0b, #ef4444);
+      transition: width 0.1s;
+    }
+    #hpBar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #34d399);
+      transition: width 0.15s;
+    }
+    .badge {
+      background: #f59e0b;
+      color: #000;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    /* Floating Popups */
+    #toast {
+      position: fixed;
+      top: 22%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fde047;
+      font-size: 22px;
+      font-weight: 900;
+      text-transform: uppercase;
+      text-shadow: 0 3px 10px rgba(0,0,0,0.85);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 15;
+      text-align: center;
+      white-space: nowrap;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translate(-50%, -65%);
+    }
+
+    /* Touch Controls */
+    #controls {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom, 16px) + 12px);
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .ctrl-group {
+      display: flex;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    .btn {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.72);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      font-size: 20px;
+      font-weight: 800;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+      active-transform: scale(0.92);
+    }
+    .btn:active, .btn.pressed {
+      transform: scale(0.9);
+      background: rgba(245, 158, 11, 0.85);
+      border-color: #fff;
+    }
+    .btn span {
+      font-size: 9px;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+      opacity: 0.9;
+    }
+    .btn-attack { border-color: #ef4444; }
+    .btn-bottle { border-color: #38bdf8; }
+    .btn-jump { border-color: #22c55e; }
+    .btn-boost { border-color: #f59e0b; }
+
+    /* Overlay Screens */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 15, 28, 0.88);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      color: #fff;
+      z-index: 30;
+    }
+    #overlay h1 {
+      font-size: 34px;
+      font-weight: 900;
+      margin: 0 0 8px;
+      background: linear-gradient(90deg, #f59e0b, #ef4444);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 1px;
+    }
+    #overlay p {
+      max-width: 340px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      margin: 0 0 20px;
+    }
+    .tips {
+      background: rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 12px;
+      text-align: left;
+      color: #e2e8f0;
+      margin-bottom: 24px;
+      max-width: 340px;
+      width: 100%;
+    }
+    .tips div { margin: 5px 0; }
+    #startBtn {
+      background: linear-gradient(90deg, #f59e0b, #ef4444);
+      border: none;
+      border-radius: 14px;
+      padding: 16px 36px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      box-shadow: 0 8px 24px rgba(239, 68, 68, 0.45);
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-box">
+      <div class="hud-row">
+        <span>POS</span>
+        <span id="posText" class="badge">1st / 6</span>
+        <span id="distText">0m</span>
+      </div>
+      <div class="hud-row">
+        <span>HP</span>
+        <div class="bar-wrap"><div id="hpBar"></div></div>
+      </div>
+      <div class="hud-row">
+        <span>ENERGY</span>
+        <div class="bar-wrap"><div id="energyBar"></div></div>
+      </div>
+    </div>
+
+    <div class="hud-box" style="text-align:right;">
+      <div class="hud-row" style="justify-content:flex-end;">
+        <span>ATK LVL</span>
+        <span id="atkLvl" class="badge">1 (FIST)</span>
+      </div>
+      <div class="hud-row" style="justify-content:flex-end;">
+        <span>KOs:</span>
+        <span id="koText">0</span>
+      </div>
+      <div class="hud-row" style="justify-content:flex-end;">
+        <span id="speedText">0 MPH</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trick / Combat Toast -->
+  <div id="toast">BACKFLIP +30 ENERGY!</div>
+
+  <!-- Touch Controls -->
+  <div id="controls">
+    <div class="ctrl-group">
+      <div class="btn" id="btnLeft">◀<span>LEFT</span></div>
+      <div class="btn" id="btnRight">▶<span>RIGHT</span></div>
+    </div>
+    <div class="ctrl-group" style="flex-direction:column; align-items:flex-end;">
+      <div style="display:flex; gap:10px;">
+        <div class="btn btn-bottle" id="btnBottle">🧴<span>THROW</span></div>
+        <div class="btn btn-attack" id="btnPunch">👊<span>STRIKE</span></div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div class="btn btn-jump" id="btnJump">⬆<span>JUMP/FLIP</span></div>
+        <div class="btn btn-boost" id="btnBoost">🔥<span>BOOST</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start / End Overlay -->
+  <div id="overlay">
+    <h1>DOWNHILL FURY</h1>
+    <p>Inspired by PS2's Downhill Domination. Race down the mountain, pull mid-air flips for energy, and knock rival riders off their bikes!</p>
+    <div class="tips">
+      <div>◀ / ▶ : Steer down the mountain</div>
+      <div>⬆ <b>JUMP / FLIP</b> : Tap to jump, hold in mid-air to backflip for Energy</div>
+      <div>👊 <b>STRIKE</b> : Melee hit nearby riders (KOs upgrade weapon!)</div>
+      <div>🧴 <b>THROW</b> : Hurl water bottles at racers ahead</div>
+      <div>🔥 <b>BOOST</b> : Spend Energy for massive downhill speed</div>
+    </div>
+    <button id="startBtn">DROP IN</button>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    // --- AUDIO SYNTH (No external audio files needed) ---
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function playTone(freq, type = 'sine', duration = 0.15, vol = 0.15) {
+      try {
+        if (!audioCtx) audioCtx = new AudioCtx();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.4, audioCtx.currentTime + duration);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    // --- SCENE SETUP ---
+    const canvas = document.getElementById('gameCanvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.FogExp2(0x87ceeb, 0.0085);
+
+    const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 300);
+
+    // Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x3b5e2b, 1.1);
+    scene.add(hemiLight);
+    const dirLight = new THREE.DirectionalLight(0xfff4d6, 1.4);
+    dirLight.position.set(30, 60, 20);
+    scene.add(dirLight);
+
+    // --- GAME CONSTANTS ---
+    const TRACK_WIDTH = 22;
+    const TRACK_LENGTH = 2400;
+    const SLOPE_ANGLE = 0.24; // Downhill tilt
+    const WEAPONS = ['FIST', 'STICK', 'PIPE', 'AXE'];
+
+    // --- TRACK & ENVIRONMENT ---
+    const worldGroup = new THREE.Group();
+    scene.add(worldGroup);
+
+    // Ground dirt path
+    const groundGeo = new THREE.PlaneGeometry(TRACK_WIDTH, TRACK_LENGTH + 200, 16, 120);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x7c5334, roughness: 0.9 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.z = -TRACK_LENGTH / 2;
+    worldGroup.add(ground);
+
+    // Side grass cliffs
+    const sideGeo = new THREE.PlaneGeometry(140, TRACK_LENGTH + 200);
+    const sideMat = new THREE.MeshStandardMaterial({ color: 0x2f6b2f, roughness: 1 });
+    const sideGround = new THREE.Mesh(sideGeo, sideMat);
+    sideGround.rotation.x = -Math.PI / 2;
+    sideGround.position.set(0, -0.05, -TRACK_LENGTH / 2);
+    worldGroup.add(sideGround);
+
+    // Finish line arch
+    const finishGroup = new THREE.Group();
+    const postGeo = new THREE.BoxGeometry(0.8, 8, 0.8);
+    const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const leftPost = new THREE.Mesh(postGeo, postMat);
+    leftPost.position.set(-TRACK_WIDTH / 2, 4, -TRACK_LENGTH);
+    const rightPost = new THREE.Mesh(postGeo, postMat);
+    rightPost.position.set(TRACK_WIDTH / 2, 4, -TRACK_LENGTH);
+    const banner = new THREE.Mesh(
+      new THREE.BoxGeometry(TRACK_WIDTH + 1, 1.8, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0xef4444 })
+    );
+    banner.position.set(0, 7.5, -TRACK_LENGTH);
+    finishGroup.add(leftPost, rightPost, banner);
+    worldGroup.add(finishGroup);
+
+    // --- BUILD RIDER MODEL ---
+    function createRiderMesh(jerseyColor) {
+      const group = new THREE.Group();
+
+      // Bike Frame
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.5, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.6, roughness: 0.3 })
+      );
+      frame.position.y = 0.65;
+      group.add(frame);
+
+      // Wheels
+      const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.18, 14);
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+      const frontWheel = new THREE.Mesh(wheelGeo, wheelMat);
+      frontWheel.rotation.z = Math.PI / 2;
+      frontWheel.position.set(0, 0.42, -0.68);
+      const backWheel = new THREE.Mesh(wheelGeo, wheelMat);
+      backWheel.rotation.z = Math.PI / 2;
+      backWheel.position.set(0, 0.42, 0.68);
+      group.add(frontWheel, backWheel);
+
+      // Handlebars
+      const bar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.85, 0.1, 0.1),
+        new THREE.MeshStandardMaterial({ color: 0xcccccc })
+      );
+      bar.position.set(0, 1.05, -0.5);
+      group.add(bar);
+
+      // Rider Torso
+      const torso = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 0.75, 0.35),
+        new THREE.MeshStandardMaterial({ color: jerseyColor })
+      );
+      torso.position.set(0, 1.25, 0.05);
+      torso.rotation.x = -0.3;
+      group.add(torso);
+
+      // Helmet
+      const helmet = new THREE.Mesh(
+        new THREE.SphereGeometry(0.26, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0xffffff })
+      );
+      helmet.position.set(0, 1.75, -0.1);
+      group.add(helmet);
+
+      // Weapon / Arm indicator
+      const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(0.18, 0.18, 0.9),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15 })
+      );
+      arm.position.set(0.42, 1.3, -0.25);
+      arm.visible = false;
+      group.add(arm);
+
+      return { group, frontWheel, backWheel, arm };
+    }
+
+    // --- OBSTACLES, RAMPS & TREES ---
+    const ramps = [];
+    const rocks = [];
+    const trees = [];
+
+    function populateTrack() {
+      // Clear old
+      [...ramps, ...rocks, ...trees].forEach(obj => worldGroup.remove(obj.mesh));
+      ramps.length = 0;
+      rocks.length = 0;
+      trees.length = 0;
+
+      // Trees along edges
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3525 });
+      const leafMat = new THREE.MeshStandardMaterial({ color: 0x1e4d2b });
+      for (let z = -30; z > -TRACK_LENGTH; z -= 22) {
+        [-1, 1].forEach(side => {
+          const tree = new THREE.Group();
+          const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2.5, 6), trunkMat);
+          trunk.position.y = 1.25;
+          const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.2, 6, 7), leafMat);
+          leaves.position.y = 4.5;
+          tree.add(trunk, leaves);
+          const xPos = side * (TRACK_WIDTH / 2 + 2.5 + Math.random() * 14);
+          tree.position.set(xPos, 0, z + Math.random() * 8);
+          worldGroup.add(tree);
+          trees.push({ mesh: tree });
+        });
+      }
+
+      // Jump Ramps
+      const rampGeo = new THREE.BoxGeometry(4.2, 1.1, 4.5);
+      const rampMat = new THREE.MeshStandardMaterial({ color: 0xd97706 });
+      for (let z = -90; z > -TRACK_LENGTH + 80; z -= 135) {
+        const ramp = new THREE.Mesh(rampGeo, rampMat);
+        ramp.rotation.x = 0.25;
+        const x = (Math.random() - 0.5) * (TRACK_WIDTH - 6);
+        ramp.position.set(x, 0.3, z);
+        worldGroup.add(ramp);
+        ramps.push({ mesh: ramp, x, z, w: 4.2, l: 4.5 });
+      }
+
+      // Boulders
+      const rockGeo = new THREE.DodecahedronGeometry(1.1, 0);
+      const rockMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 });
+      for (let z = -70; z > -TRACK_LENGTH + 60; z -= 55) {
+        const rock = new THREE.Mesh(rockGeo, rockMat);
+        const x = (Math.random() - 0.5) * (TRACK_WIDTH - 3);
+        rock.position.set(x, 0.8, z);
+        worldGroup.add(rock);
+        rocks.push({ mesh: rock, x, z, r: 1.15 });
+      }
+    }
+
+    // --- GAME STATE ---
+    let gameActive = false;
+    const player = {
+      meshObj: createRiderMesh(0xef4444),
+      x: 0,
+      y: 0,
+      z: 0,
+      vx: 0,
+      vy: 0,
+      speed: 0,
+      baseMaxSpeed: 46,
+      hp: 100,
+      energy: 60,
+      atkLevel: 1,
+      kos: 0,
+      grounded: true,
+      flipAngle: 0,
+      flipping: false,
+      attackTimer: 0,
+      stunTimer: 0
+    };
+    worldGroup.add(player.meshObj.group);
+
+    // AI Rivals
+    const rivalColors = [0x3b82f6, 0x10b981, 0xa855f7, 0xf97316, 0xec4899];
+    const rivals = rivalColors.map(color => {
+      const m = createRiderMesh(color);
+      worldGroup.add(m.group);
+      return {
+        meshObj: m,
+        x: 0,
+        y: 0,
+        z: 0,
+        speed: 40,
+        baseSpeed: 40,
+        hp: 60,
+        downTimer: 0,
+        targetX: 0
+      };
+    });
+
+    // Water bottles projectiles
+    const bottles = [];
+    const bottleGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.55, 8);
+    const bottleMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7 });
+
+    // --- CONTROLS ---
+    const input = { left: false, right: false, jump: false, boost: false };
+
+    function bindBtn(id, key, onPress) {
+      const el = document.getElementById(id);
+      const start = (e) => {
+        e.preventDefault();
+        el.classList.add('pressed');
+        if (key) input[key] = true;
+        if (onPress) onPress();
+      };
+      const end = (e) => {
+        e.preventDefault();
+        el.classList.remove('pressed');
+        if (key) input[key] = false;
+      };
+      el.addEventListener('touchstart', start, { passive: false });
+      el.addEventListener('touchend', end, { passive: false });
+      el.addEventListener('mousedown', start);
+      el.addEventListener('mouseup', end);
+      el.addEventListener('mouseleave', end);
+    }
+
+    // Toast notification
+    let toastTimeout;
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => t.classList.remove('show'), 1300);
+    }
+
+    // Melee Strike
+    function triggerPunch() {
+      if (!gameActive || player.attackTimer > 0 || player.stunTimer > 0) return;
+      player.attackTimer = 0.28;
+      player.meshObj.arm.visible = true;
+      playTone(180, 'sawtooth', 0.12, 0.2);
+
+      const damage = 25 + (player.atkLevel - 1) * 15;
+      rivals.forEach(r => {
+        if (r.downTimer > 0) return;
+        const dx = Math.abs(r.x - player.x);
+        const dz = Math.abs(r.z - player.z);
+        if (dx < 2.3 && dz < 2.8) {
+          r.hp -= damage;
+          r.x += (r.x >= player.x ? 1.8 : -1.8);
+          playTone(110, 'square', 0.18, 0.25);
+          if (r.hp <= 0) {
+            r.downTimer = 3.2;
+            r.hp = 60;
+            player.kos++;
+            player.energy = Math.min(100, player.energy + 25);
+            if (player.atkLevel < 4) {
+              player.atkLevel++;
+              showToast(`KO! WEAPON UPGRADE: ${WEAPONS[player.atkLevel - 1]}!`);
+            } else {
+              showToast('RIVAL KNOCKED OUT! +25 ENERGY');
+            }
+          } else {
+            showToast(`SMACK! -${damage} HP`);
+          }
+        }
+      });
+    }
+
+    // Water Bottle Throw
+    function triggerBottle() {
+      if (!gameActive || player.energy < 12 || player.stunTimer > 0) return;
+      player.energy -= 12;
+      playTone(520, 'triangle', 0.12, 0.15);
+
+      const mesh = new THREE.Mesh(bottleGeo, bottleMat);
+      mesh.position.set(player.x, player.y + 1.3, player.z - 1);
+      worldGroup.add(mesh);
+      bottles.push({ mesh, x: player.x, y: player.y + 1.3, z: player.z - 1, life: 1.5 });
+    }
+
+    // Jump & Flip
+    function triggerJump() {
+      if (!gameActive || player.stunTimer > 0) return;
+      if (player.grounded) {
+        player.vy = 11.5;
+        player.grounded = false;
+        playTone(300, 'sine', 0.15, 0.15);
+      }
+    }
+
+    bindBtn('btnLeft', 'left');
+    bindBtn('btnRight', 'right');
+    bindBtn('btnBoost', 'boost');
+    bindBtn('btnJump', 'jump', triggerJump);
+    bindBtn('btnPunch', null, triggerPunch);
+    bindBtn('btnBottle', null, triggerBottle);
+
+    // Keyboard fallback for desktop testing
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a') input.left = true;
+      if (e.key === 'ArrowRight' || e.key === 'd') input.right = true;
+      if (e.key === ' ' || e.key === 'ArrowUp') { input.jump = true; triggerJump(); }
+      if (e.key === 'Shift') input.boost = true;
+      if (e.key === 'z' || e.key === 'j') triggerPunch();
+      if (e.key === 'x' || e.key === 'k') triggerBottle();
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a') input.left = false;
+      if (e.key === 'ArrowRight' || e.key === 'd') input.right = false;
+      if (e.key === ' ' || e.key === 'ArrowUp') input.jump = false;
+      if (e.key === 'Shift') input.boost = false;
+    });
+
+    // --- START / RESET GAME ---
+    function startGame() {
+      populateTrack();
+      player.x = 0;
+      player.y = 0;
+      player.z = 0;
+      player.vx = 0;
+      player.vy = 0;
+      player.speed = 20;
+      player.hp = 100;
+      player.energy = 60;
+      player.atkLevel = 1;
+      player.kos = 0;
+      player.grounded = true;
+      player.flipAngle = 0;
+      player.stunTimer = 0;
+
+      rivals.forEach((r, idx) => {
+        r.x = (idx - 2) * 3.2;
+        r.y = 0;
+        r.z = -8 - idx * 4;
+        r.baseSpeed = 41 + idx * 1.3;
+        r.speed = r.baseSpeed;
+        r.hp = 60;
+        r.downTimer = 0;
+        r.targetX = r.x;
+        r.meshObj.group.rotation.z = 0;
+      });
+
+      bottles.forEach(b => worldGroup.remove(b.mesh));
+      bottles.length = 0;
+
+      document.getElementById('overlay').style.display = 'none';
+      gameActive = true;
+      playTone(440, 'triangle', 0.25, 0.2);
+    }
+
+    document.getElementById('startBtn').addEventListener('click', startGame);
+
+    function endGame(title, subtitle) {
+      gameActive = false;
+      const ov = document.getElementById('overlay');
+      ov.querySelector('h1').textContent = title;
+      ov.querySelector('p').textContent = subtitle;
+      document.getElementById('startBtn').textContent = 'RACE AGAIN';
+      ov.style.display = 'flex';
+    }
+
+    // --- MAIN LOOP ---
+    let lastTime = performance.now();
+
+    function update(dt) {
+      if (!gameActive) return;
+
+      // Stun recovery
+      if (player.stunTimer > 0) {
+        player.stunTimer -= dt;
+        player.meshObj.group.rotation.z = Math.sin(player.stunTimer * 25) * 0.6;
+      } else {
+        player.meshObj.group.rotation.z = -player.vx * 0.04;
+      }
+
+      // Attack animation
+      if (player.attackTimer > 0) {
+        player.attackTimer -= dt;
+        player.meshObj.arm.rotation.y = Math.sin(player.attackTimer * 20) * 1.2;
+        if (player.attackTimer <= 0) player.meshObj.arm.visible = false;
+      }
+
+      // Steering
+      const steerForce = 36;
+      if (input.left) player.vx -= steerForce * dt;
+      if (input.right) player.vx += steerForce * dt;
+      player.vx *= Math.pow(0.08, dt); // Lateral damping
+      player.x += player.vx * dt;
+      player.x = Math.max(-TRACK_WIDTH / 2 + 1, Math.min(TRACK_WIDTH / 2 - 1, player.x));
+
+      // Boost & Downhill Acceleration
+      let targetSpeed = player.baseMaxSpeed + (player.atkLevel - 1) * 2;
+      if (input.boost && player.energy > 0 && player.stunTimer <= 0) {
+        targetSpeed += 22;
+        player.energy = Math.max(0, player.energy - 28 * dt);
+      } else {
+        player.energy = Math.min(100, player.energy + 3 * dt);
+      }
+
+      if (player.stunTimer > 0) targetSpeed = 14;
+      player.speed += (targetSpeed - player.speed) * 2.5 * dt;
+      player.z -= player.speed * dt;
+
+      // Ramps check
+      if (player.grounded) {
+        for (const r of ramps) {
+          if (Math.abs(player.x - r.x) < r.w / 2 && Math.abs(player.z - r.z) < r.l / 2) {
+            player.vy = 16.5;
+            player.grounded = false;
+            playTone(380, 'sine', 0.2, 0.2);
+            break;
+          }
+        }
+      }
+
+      // Gravity & Mid-Air Backflips
+      if (!player.grounded) {
+        player.vy -= 28 * dt;
+        player.y += player.vy * dt;
+
+        if (input.jump) {
+          player.flipAngle += 7.5 * dt;
+          player.meshObj.group.rotation.x = player.flipAngle;
+          if (player.flipAngle >= Math.PI * 1.85) {
+            player.flipAngle = 0;
+            player.energy = Math.min(100, player.energy + 30);
+            player.speed += 10;
+            playTone(660, 'sine', 0.2, 0.2);
+            showToast('BACKFLIP! +30 ENERGY!');
+          }
+        }
+
+        if (player.y <= 0) {
+          // Check if landed mid-flip
+          if (player.flipAngle > 0.7 && player.flipAngle < Math.PI * 1.6) {
+            player.stunTimer = 1.0;
+            player.hp -= 15;
+            playTone(90, 'sawtooth', 0.25, 0.25);
+            showToast('CRASHED LANDING!');
+          }
+          player.y = 0;
+          player.vy = 0;
+          player.grounded = true;
+          player.flipAngle = 0;
+          player.meshObj.group.rotation.x = 0;
+        }
+      }
+
+      // Boulder collisions
+      if (player.y < 1.2 && player.stunTimer <= 0) {
+        for (const rock of rocks) {
+          if (Math.hypot(player.x - rock.x, player.z - rock.z) < rock.r + 0.5) {
+            player.stunTimer = 1.1;
+            player.speed = 12;
+            player.hp -= 20;
+            rock.z += 10; // Move rock out of way so no double-hit
+            playTone(85, 'sawtooth', 0.25, 0.3);
+            showToast('HIT A BOULDER! -20 HP');
+            break;
+          }
+        }
+      }
+
+      // Update player mesh
+      player.meshObj.group.position.set(player.x, player.y, player.z);
+      player.meshObj.frontWheel.rotation.x -= player.speed * dt * 1.5;
+      player.meshObj.backWheel.rotation.x -= player.speed * dt * 1.5;
+
+      // Update Water Bottles
+      for (let i = bottles.length - 1; i >= 0; i--) {
+        const b = bottles[i];
+        b.z -= (player.speed + 38) * dt;
+        b.mesh.position.z = b.z;
+        b.mesh.rotation.x += 12 * dt;
+        b.life -= dt;
+
+        let hit = false;
+        for (const r of rivals) {
+          if (r.downTimer <= 0 && Math.abs(b.x - r.x) < 1.4 && Math.abs(b.z - r.z) < 1.8) {
+            r.downTimer = 2.6;
+            player.kos++;
+            player.energy = Math.min(100, player.energy + 15);
+            playTone(140, 'square', 0.2, 0.25);
+            showToast('DIRECT BOTTLE HIT!');
+            hit = true;
+            break;
+          }
+        }
+
+        if (hit || b.life <= 0) {
+          worldGroup.remove(b.mesh);
+          bottles.splice(i, 1);
+        }
+      }
+
+      // Update Rivals
+      rivals.forEach(r => {
+        if (r.downTimer > 0) {
+          r.downTimer -= dt;
+          r.meshObj.group.rotation.z = Math.PI / 2;
+          r.speed = 8;
+        } else {
+          r.meshObj.group.rotation.z = 0;
+          // Rubber-banding AI so races stay exciting and competitive
+          const distDiff = player.z - r.z; // negative if rival is ahead
+          let aiTarget = r.baseSpeed;
+          if (distDiff < -45) aiTarget -= 6;
+          if (distDiff > 35) aiTarget += 9;
+          r.speed += (aiTarget - r.speed) * 2 * dt;
+
+          if (Math.random() < 0.02) {
+            r.targetX = (Math.random() - 0.5) * (TRACK_WIDTH - 3);
+          }
+          r.x += (r.targetX - r.x) * 1.8 * dt;
+        }
+        r.z -= r.speed * dt;
+        r.meshObj.group.position.set(r.x, 0, r.z);
+        r.meshObj.frontWheel.rotation.x -= r.speed * dt * 1.5;
+        r.meshObj.backWheel.rotation.x -= r.speed * dt * 1.5;
+      });
+
+      // Check HP or Finish Line
+      if (player.hp <= 0) {
+        endGame('WIPEOUT!', `You crashed out at ${Math.floor(-player.z)}m with ${player.kos} KOs.`);
+        return;
+      }
+
+      // Calculate Race Rank
+      let rank = 1;
+      rivals.forEach(r => { if (r.z < player.z) rank++; });
+      const suffixes = ['st', 'nd', 'rd', 'th', 'th', 'th'];
+
+      if (player.z <= -TRACK_LENGTH) {
+        endGame(
+          rank === 1 ? '1ST PLACE VICTORY!' : `FINISHED ${rank}${suffixes[rank - 1].toUpperCase()}!`,
+          `Total KOs: ${player.kos} | Max Weapon: ${WEAPONS[player.atkLevel - 1]}`
+        );
+        return;
+      }
+
+      // Update HUD
+      document.getElementById('posText').textContent = `${rank}${suffixes[rank - 1]} / 6`;
+      document.getElementById('distText').textContent = `${Math.floor((-player.z / TRACK_LENGTH) * 100)}%`;
+      document.getElementById('hpBar').style.width = `${Math.max(0, player.hp)}%`;
+      document.getElementById('energyBar').style.width = `${player.energy}%`;
+      document.getElementById('atkLvl').textContent = `${player.atkLevel} (${WEAPONS[player.atkLevel - 1]})`;
+      document.getElementById('koText').textContent = player.kos;
+      document.getElementById('speedText').textContent = `${Math.round(player.speed * 1.3)} MPH`;
+
+      // Smooth Chase Camera
+      const camTargetX = player.x * 0.65;
+      const camTargetY = player.y + 4.2 + (input.boost ? 0.3 : 0);
+      const camTargetZ = player.z + 7.2 + (input.boost ? 0.8 : 0);
+
+      camera.position.x += (camTargetX - camera.position.x) * 8 * dt;
+      camera.position.y += (camTargetY - camera.position.y) * 8 * dt;
+      camera.position.z = camTargetZ;
+      camera.lookAt(player.x * 0.8, player.y + 1.5, player.z - 14);
+    }
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      update(dt);
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate(performance.now());
+  </script>
+</body>
+</html>
